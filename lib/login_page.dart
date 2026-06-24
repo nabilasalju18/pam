@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard_page.dart';
 import 'main.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({
@@ -28,60 +27,47 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-Future<void> login() async {
-  String username = usernameController.text.trim();
-  String password = passwordController.text.trim();
+  Future<void> login() async {
+    String username = usernameController.text.trim();
+    String password = passwordController.text.trim();
 
-  if (username.isEmpty || password.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Username dan Password wajib diisi"),
-      ),
-    );
-    return;
-  }
+    try {
+      final supabase = Supabase.instance.client;
 
-  try {
-    final response = await http.post(
-      Uri.parse(
-        'http://192.168.1.38/pam_backend/login.php',
-      ),
-      body: {
-        'username': username,
-        'password': password,
-      },
-    );
+      final data = await supabase
+          .from('users')
+          .select()
+          .eq('username', username)
+          .eq('password', password)
+          .maybeSingle();
 
-    final data = jsonDecode(response.body);
+      if (data != null) {
+        currentUser = data['username'];
+        currentRole = data['role'];
 
-    if (data['status'] == true) {
-      currentUser = data['user']['username'];
-      currentRole = data['user']['role'];
-      
+        await simpanData();
 
-      await simpanData();
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => DashboardPage(),
-        ),
-      );
-    } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DashboardPage(),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Username atau password salah"),
+          ),
+        );
+      }
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(data['message']),
+          content: Text("Error: $e"),
         ),
       );
     }
-  } catch (e) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Error: $e"),
-      ),
-    );
   }
-}
 
 Future<void> simpanData() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
