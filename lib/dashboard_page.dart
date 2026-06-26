@@ -174,7 +174,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       // HEADER
                       // =====================
                       Text(
-                        "Halo, $currentUser 👋",
+                        "Halo, $currentUser",
                         style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 5),

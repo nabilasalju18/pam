@@ -1,36 +1,52 @@
 import 'package:flutter/material.dart';
-import 'main.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InputMeteranPage extends StatefulWidget {
-  const InputMeteranPage({
-    super.key,
-  });
+  const InputMeteranPage({super.key});
 
   @override
   State<InputMeteranPage> createState() => _InputMeteranPageState();
 }
 
 class _InputMeteranPageState extends State<InputMeteranPage> {
-  String? selectedPelanggan;
+  final supabase = Supabase.instance.client;
 
+  int? selectedPelanggan;
   final cariController = TextEditingController();
-
   final meterLamaController = TextEditingController();
-
   final meterBaruController = TextEditingController();
 
+  List<Map<String, dynamic>> semuaPelanggan = [];
   List<Map<String, dynamic>> hasilCari = [];
 
   int pemakaian = 0;
   int totalTagihan = 0;
-
   final int tarifAir = 2000;
-
+  bool isLoading = false;
+  
   @override
   void initState() {
     super.initState();
+    ambilDataPelanggan();
+  }
 
-    hasilCari = List.from(dataPelanggan);
+  // ==========================================
+  // QUERY: AMBIL DATA PELANGGAN DARI SUPABASE
+  // ==========================================
+  Future<void> ambilDataPelanggan() async {
+    try {
+      final response = await supabase
+          .from('pelanggan')
+          .select()
+          .order('nama', ascending: true);
+
+      setState(() {
+        semuaPelanggan = List<Map<String, dynamic>>.from(response);
+        hasilCari = semuaPelanggan;
+      });
+    } catch (e) {
+      debugPrint("Gagal mengambil data pelanggan: $e");
+    }
   }
 
   // ===================
@@ -40,7 +56,7 @@ class _InputMeteranPageState extends State<InputMeteranPage> {
     String keyword,
   ) {
     setState(() {
-      hasilCari = dataPelanggan.where(
+      hasilCari = semuaPelanggan.where(
         (pelanggan) {
           return pelanggan["nama"].toString().toLowerCase().contains(
                 keyword.toLowerCase(),
@@ -53,119 +69,103 @@ class _InputMeteranPageState extends State<InputMeteranPage> {
   // ===================
   // HITUNG TAGIHAN
   // ===================
-  Future<void> hitungTagihan() async {
-    int meterLama = int.tryParse(
-          meterLamaController.text,
-        ) ??
-        0;
+Future<void> hitungTagihan() async {
+  int meterLama = int.tryParse(meterLamaController.text) ?? 0;
+  int meterBaru = int.tryParse(meterBaruController.text) ?? 0;
 
-    int meterBaru = int.tryParse(
-          meterBaruController.text,
-        ) ??
-        0;
+  if (selectedPelanggan == null || meterBaruController.text.isEmpty) {
+    _showSnackBar("Pilih pelanggan dan isi meter sekarang");
+    return;
+  }
 
-    // VALIDASI
-    if (selectedPelanggan == null || meterBaruController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Pilih pelanggan dan isi meter sekarang",
-          ),
-        ),
-      );
+  if (meterBaru < meterLama) {
+    _showSnackBar("Meter sekarang tidak boleh lebih kecil dari meter sebelumnya");
+    return;
+  }
+
+  setState(() => isLoading = true);
+
+  try {
+    final dataUser = semuaPelanggan.firstWhere((item) => item["id"] == selectedPelanggan);
+    
+    // 1. CEK TUNGGAKAN
+    final cekTagihan = await supabase
+        .from('tagihan')
+        .select()
+        .eq('pelanggan_id', selectedPelanggan!)
+        .eq('status', 'Belum Bayar')
+        .maybeSingle();
+
+    if (cekTagihan != null) {
+      _showSnackBar("Pelanggan masih memiliki tagihan yang Belum Bayar!");
+      setState(() => isLoading = false);
       return;
     }
 
-    // VALIDASI METER
-    if (meterBaru < meterLama) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Meter sekarang tidak boleh lebih kecil dari meter sebelumnya",
-          ),
-        ),
-      );
-      return;
-    }
-
-    // HITUNG
     int hasilPemakaian = meterBaru - meterLama;
-
     int hasilTagihan = hasilPemakaian * tarifAir;
 
-    setState(() {
-      pemakaian = hasilPemakaian;
+    // 2. SIMPAN KE TABEL METERAN (Gunakan maybeSingle untuk mencegah crash null)
+    final meteranResponse = await supabase.from('meteran').insert({
+      "pelanggan_id": selectedPelanggan, 
+      "meter_lama": meterLama,
+      "meter_baru": meterBaru,
+      "pemakaian": hasilPemakaian, // Sekarang aman karena tipe di DB sudah numeric
+    }).select().maybeSingle();
 
-      totalTagihan = hasilTagihan;
-    });
-
-    // CEGAH DUPLIKAT
-    bool sudahAda = dataTagihan.any(
-      (item) =>
-          item["nama"] == selectedPelanggan && item["status"] == "Belum Bayar",
-    );
-
-    if (sudahAda) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Pelanggan masih punya tagihan",
-          ),
-        ),
-      );
+    // Validasi pencegahan error 'method [] called on null'
+    if (meteranResponse == null || meteranResponse['id'] == null) {
+      _showSnackBar("Gagal mengonfirmasi penyimpanan data meteran.");
+      setState(() => isLoading = false);
       return;
     }
 
-    // UPDATE METER PELANGGAN
-    int indexPelanggan = dataPelanggan.indexWhere(
-      (item) => item["nama"] == selectedPelanggan,
-    );
+    final int baruMeteranId = meteranResponse['id'];
 
-    if (indexPelanggan != -1) {
-      dataPelanggan[indexPelanggan]["meter"] = meterBaru.toString();
-    }
-
-    // SIMPAN TAGIHAN
-    dataTagihan.add({
-      "nama": selectedPelanggan,
+    // 3. SIMPAN KE TABEL TAGIHAN
+    await supabase.from('tagihan').insert({
+      "pelanggan_id": selectedPelanggan, 
+      "meteran_id": baruMeteranId, 
       "pemakaian": hasilPemakaian,
       "tagihan": hasilTagihan,
       "status": "Belum Bayar",
-      "meterLama": meterLama,
-      "meterBaru": meterBaru,
     });
 
-    await simpanData();
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(
-      const SnackBar(
-        content: Text(
-          "Tagihan berhasil dibuat",
-        ),
-      ),
-    );
-
-    meterBaruController.clear();
-
-    cariController.clear();
+    // 4. UPDATE NO METER PELANGGAN
+    await supabase.from('pelanggan').update({
+      "no_meter": meterBaru,
+    }).eq('id', dataUser['id']);
 
     setState(() {
-      selectedPelanggan = null;
+      pemakaian = hasilPemakaian;
+      totalTagihan = hasilTagihan;
     });
+
+    _showSnackBar("Tagihan dan riwayat meteran berhasil dibuat ke database");
+
+    meterBaruController.clear();
+    cariController.clear();
+    setState(() {
+      selectedPelanggan = null;
+      meterLamaController.clear();
+    });
+
+    ambilDataPelanggan();
+
+  } catch (e) {
+    _showSnackBar("Terjadi kesalahan database: $e");
+  } finally {
+    setState(() => isLoading = false);
+  }
+}
+  void _showSnackBar(String pesan) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(pesan)));
+    }
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(
         0xffF5F9FF,
@@ -208,7 +208,7 @@ class _InputMeteranPageState extends State<InputMeteranPage> {
             ),
 
             // DROPDOWN
-            DropdownButtonFormField<String>(
+            DropdownButtonFormField<int>(
               value: selectedPelanggan,
               decoration: InputDecoration(
                 labelText: "Pilih Pelanggan",
@@ -221,29 +221,30 @@ class _InputMeteranPageState extends State<InputMeteranPage> {
                   borderSide: BorderSide.none,
                 ),
               ),
-              items: hasilCari.map(
-                (
-                  pelanggan,
-                ) {
-                  return DropdownMenuItem<String>(
-                    value: pelanggan["nama"],
+              items: hasilCari.map((pelanggan) {
+                  return DropdownMenuItem<int>(
+                    value: pelanggan["id"], // VALUE SEKARANG ADALAH ID (int)
                     child: Text(
-                      "${pelanggan["nama"]} - Meter ${pelanggan["meter"]}",
+                      "${pelanggan["nama"]} - Meter: ${pelanggan["no_meter"] ?? 0}",
                     ),
                   );
-                },
-              ).toList(),
+                }).toList(),
 
               // AUTO METER
               onChanged: (value) {
                 setState(() {
                   selectedPelanggan = value;
 
-                  var pelanggan = dataPelanggan.firstWhere(
-                    (item) => item["nama"] == value,
+                  var pelanggan = semuaPelanggan.firstWhere(
+                    (item) => item["id"] == value,
+                    orElse: () => {},
                   );
 
-                  meterLamaController.text = pelanggan["meter"].toString();
+                  if (pelanggan.isNotEmpty) {
+                    meterLamaController.text = (pelanggan["no_meter"] ?? 0).toString();
+                  } else {
+                    meterLamaController.text = "0";
+                  }
                 });
               },
             ),
@@ -257,7 +258,7 @@ class _InputMeteranPageState extends State<InputMeteranPage> {
               controller: meterLamaController,
               readOnly: true,
               decoration: InputDecoration(
-                labelText: "Meter Bulan Lalu",
+                labelText: "No Meter Sebelumnya",
                 prefixIcon: const Icon(
                   Icons.speed,
                 ),

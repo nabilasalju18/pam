@@ -67,8 +67,6 @@ Future<void> simpanData() async {
 Future<void> loadData() async {
   final prefs = await SharedPreferences.getInstance();
 
-  
-
   String? tagihan = prefs.getString(
     "tagihan",
   );
