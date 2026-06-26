@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_page.dart';
 import 'dashboard_page.dart';
 
@@ -17,6 +17,11 @@ List<Map<String, dynamic>> dataRiwayat = [];
 String currentUser = "";
 String currentRole = "";
 
+Future<void> loadSession() async {
+  final prefs = await SharedPreferences.getInstance();
+  currentUser = prefs.getString("currentUser") ?? "";
+  currentRole = prefs.getString("currentRole") ?? "";
+}
 // =======================
 // SIMPAN DATA
 // =======================
@@ -62,9 +67,7 @@ Future<void> simpanData() async {
 Future<void> loadData() async {
   final prefs = await SharedPreferences.getInstance();
 
-  String? pelanggan = prefs.getString(
-    "pelanggan",
-  );
+  
 
   String? tagihan = prefs.getString(
     "tagihan",
@@ -75,13 +78,7 @@ Future<void> loadData() async {
   );
 
   // LOAD PELANGGAN
-  if (pelanggan != null) {
-    dataPelanggan = List<Map<String, dynamic>>.from(
-      jsonDecode(
-        pelanggan,
-      ),
-    );
-  }
+
 
   // LOAD TAGIHAN
   if (tagihan != null) {
@@ -117,8 +114,11 @@ Future<void> loadData() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  await loadData();
+  await Supabase.initialize(
+    url: 'https://ffchsmgkzhkbibzpaawd.supabase.co', // Ganti dengan URL proyek Supabase-mu
+    anonKey: 'sb_publishable_TvhSlR06UtG0ZcY9nb7G-A_8Ch5rIrW', // Ganti dengan Anon Key Supabase-mu
+  );
+  await loadSession();
 
   runApp(
     const MyApp(),

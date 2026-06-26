@@ -1,186 +1,201 @@
 import 'package:flutter/material.dart';
-import 'main.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DataPelangganPage extends StatefulWidget {
-  const DataPelangganPage({
-    super.key,
-  });
+  const DataPelangganPage({super.key});
 
   @override
   State<DataPelangganPage> createState() => _DataPelangganPageState();
 }
 
 class _DataPelangganPageState extends State<DataPelangganPage> {
+  final supabase = Supabase.instance.client;
+  
   final namaController = TextEditingController();
-
   final alamatController = TextEditingController();
-
   final meterController = TextEditingController();
-
+  final noHpController = TextEditingController();
   final cariController = TextEditingController();
-
-  List<Map<String, dynamic>> hasilPencarian = [];
+  
+  List<Map<String, dynamic>> listPelanggan = [];
+  bool isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    hasilPencarian = List.from(dataPelanggan);
+    muatDataPelanggan();
   }
 
-  void cariPelanggan(String keyword) {
-    setState(() {
-      hasilPencarian = dataPelanggan.where(
-        (pelanggan) {
-          return pelanggan["nama"].toString().toLowerCase().contains(
-                keyword.toLowerCase(),
-              );
-        },
-      ).toList();
-    });
+  // ==========================================
+  // QUERY: CARI PELANGGAN LANGSUNG KE SUPABASE
+  // ==========================================
+  Future<void> cariPelanggan(String keyword) async {
+    if (keyword.isEmpty) {
+      muatDataPelanggan();
+      return;
+    }
+    
+    try {
+      final response = await supabase
+          .from('pelanggan')
+          .select()
+          .ilike('nama', '%$keyword%') // Pencarian case-insensitive cloud
+          .order('nama', ascending: true);
+
+      setState(() {
+        listPelanggan = List<Map<String, dynamic>>.from(response);
+      });
+    } catch (e) {
+      debugPrint("Gagal mencari data: $e");
+    }
   }
 
   void clearForm() {
     namaController.clear();
     alamatController.clear();
     meterController.clear();
+    noHpController.clear();
   }
 
   Widget inputModern(
     TextEditingController controller,
     String label,
-    IconData icon,
-  ) {
+    IconData icon, {
+    TextInputType keyboardType = TextInputType.text,
+  }) {
     return TextField(
       controller: controller,
+      keyboardType: keyboardType,
       decoration: InputDecoration(
         prefixIcon: Icon(icon),
         labelText: label,
         filled: true,
         fillColor: Colors.grey[100],
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(
-            18,
-          ),
+          borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide.none,
         ),
       ),
     );
   }
 
+  // ==========================================
+  // QUERY: MUAT DATA PELANGGAN
+  // ==========================================
+  Future<void> muatDataPelanggan() async {
+    setState(() => isLoading = true);
+    try {
+      final response = await supabase
+          .from('pelanggan')
+          .select()
+          .order('nama', ascending: true);
+
+      setState(() {
+        listPelanggan = List<Map<String, dynamic>>.from(response);
+      });
+    } catch (e) {
+      debugPrint("Gagal mengambil data: $e");
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+    
+  // ==========================================
+  // QUERY: TAMBAH PELANGGAN BARU
+  // ==========================================
   Future<void> tambahPelanggan() async {
-    if (namaController.text.isEmpty ||
-        alamatController.text.isEmpty ||
-        meterController.text.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "Semua data wajib diisi",
-          ),
-        ),
+    String nama = namaController.text.trim();
+    String alamat = alamatController.text.trim();
+    double noMeter = double.tryParse(meterController.text.trim()) ?? 0.0;
+
+    if (nama.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Nama pelanggan wajib diisi!")),
       );
       return;
     }
 
-    setState(() {
-      dataPelanggan.add({
-        "nama": namaController.text,
-        "alamat": alamatController.text,
-        "meter": meterController.text,
+    try {
+      await supabase.from('pelanggan').insert({
+        'nama': nama,
+        'alamat': alamat,
+        'no_meter': noMeter, // Pastikan nama kolom sesuai struktur tabel Supabase-mu
       });
 
-      hasilPencarian = List.from(
-        dataPelanggan,
-      );
-    });
-
-    await simpanData();
-
-    clearForm();
-
-    Navigator.pop(context);
+      if (mounted) Navigator.pop(context); // Tutup dialog form tambah
+      clearForm();
+      muatDataPelanggan(); // Refresh list data
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Pelanggan berhasil ditambahkan!")),
+        );
+      }
+    } catch (e) {
+      debugPrint("Gagal menambah data: $e");
+    }
   }
 
-  Future<void> hapusPelanggan(
-    int index,
-  ) async {
-    dataPelanggan.remove(
-      hasilPencarian[index],
-    );
-
-    hasilPencarian = List.from(
-      dataPelanggan,
-    );
-
-    await simpanData();
-
-    setState(() {});
+  // ==========================================
+  // QUERY: HAPUS PELANGGAN
+  // ==========================================
+  Future<void> hapusPelanggan(int id) async {
+    try {
+      await supabase.from('pelanggan').delete().eq('id', id);
+      muatDataPelanggan(); 
+    } catch (e) {
+      debugPrint("Gagal menghapus: $e");
+    }
   }
 
+  // ==========================================
+  // QUERY: UPDATE / EDIT DATA PELANGGAN
+  // ==========================================
   void editPelanggan(int index) {
-    namaController.text = hasilPencarian[index]["nama"];
+    final pelangganLama = listPelanggan[index];
+    int idPelanggan = pelangganLama["id"];
 
-    alamatController.text = hasilPencarian[index]["alamat"];
-
-    meterController.text = hasilPencarian[index]["meter"];
+    namaController.text = pelangganLama["nama"] ?? '';
+    alamatController.text = pelangganLama["alamat"] ?? '';
+    meterController.text = (pelangganLama["no_meter"] ?? '').toString();
 
     showDialog(
       context: context,
       builder: (_) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(
-              25,
-            ),
-          ),
-          title: const Text(
-            "Edit Pelanggan",
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          title: const Text("Edit Pelanggan"),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                inputModern(
-                  namaController,
-                  "Nama",
-                  Icons.person,
-                ),
+                inputModern(namaController, "Nama", Icons.person),
                 const SizedBox(height: 15),
-                inputModern(
-                  alamatController,
-                  "Alamat",
-                  Icons.home,
-                ),
+                inputModern(alamatController, "Alamat", Icons.home),
                 const SizedBox(height: 15),
-                inputModern(
-                  meterController,
-                  "No Meter",
-                  Icons.water_drop,
-                ),
+                inputModern(meterController, "No Meter", Icons.water_drop, keyboardType: TextInputType.number),
               ],
             ),
           ),
           actions: [
             ElevatedButton(
               onPressed: () async {
-                setState(() {
-                  hasilPencarian[index] = {
-                    "nama": namaController.text,
-                    "alamat": alamatController.text,
-                    "meter": meterController.text,
-                  };
-                });
+                try {
+                  // Kirim perintah UPDATE ke Supabase
+                  await supabase.from('pelanggan').update({
+                    "nama": namaController.text.trim(),
+                    "alamat": alamatController.text.trim(),
+                    "no_meter": double.tryParse(meterController.text.trim()) ?? 0.0,
+                  }).eq('id', idPelanggan);
 
-                await simpanData();
-
-                Navigator.pop(context);
-
-                clearForm();
+                  if (mounted) Navigator.pop(context); // Tutup dialog
+                  clearForm();
+                  muatDataPelanggan(); // Reload data terbaru
+                } catch (e) {
+                  debugPrint("Gagal mengupdate data: $e");
+                }
               },
-              child: const Text(
-                "Simpan",
-              ),
+              child: const Text("Simpan"),
             )
           ],
         );
@@ -190,49 +205,28 @@ class _DataPelangganPageState extends State<DataPelangganPage> {
 
   void formTambah() {
     clearForm();
-
     showDialog(
       context: context,
       builder: (_) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(
-              25,
-            ),
-          ),
-          title: const Text(
-            "Tambah Pelanggan",
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          title: const Text("Tambah Pelanggan"),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                inputModern(
-                  namaController,
-                  "Nama",
-                  Icons.person,
-                ),
+                inputModern(namaController, "Nama", Icons.person),
                 const SizedBox(height: 15),
-                inputModern(
-                  alamatController,
-                  "Alamat",
-                  Icons.home,
-                ),
+                inputModern(alamatController, "Alamat", Icons.home),
                 const SizedBox(height: 15),
-                inputModern(
-                  meterController,
-                  "No Meter",
-                  Icons.water_drop,
-                ),
+                inputModern(meterController, "No Meter", Icons.water_drop, keyboardType: TextInputType.number),
               ],
             ),
           ),
           actions: [
             ElevatedButton(
               onPressed: tambahPelanggan,
-              child: const Text(
-                "Simpan",
-              ),
+              child: const Text("Simpan"),
             ),
           ],
         );
@@ -274,14 +268,14 @@ class _DataPelangganPageState extends State<DataPelangganPage> {
             ),
           ),
           Expanded(
-            child: hasilPencarian.isEmpty
+            child: listPelanggan.isEmpty
                 ? const Center(
                     child: Text(
                       "Belum ada pelanggan",
                     ),
                   )
                 : ListView.builder(
-                    itemCount: hasilPencarian.length,
+                    itemCount: listPelanggan.length,
                     itemBuilder: (
                       context,
                       index,
@@ -310,13 +304,13 @@ class _DataPelangganPageState extends State<DataPelangganPage> {
                             ),
                           ),
                           title: Text(
-                            hasilPencarian[index]["nama"],
+                            listPelanggan[index]["nama"],
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           subtitle: Text(
-                            "${hasilPencarian[index]["alamat"]}\nMeter : ${hasilPencarian[index]["meter"]}",
+                            "${listPelanggan[index]["alamat"]}\nMeter : ${listPelanggan[index]["no_meter"]}",
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
