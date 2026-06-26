@@ -11,8 +11,80 @@ import 'tagihan_saya_page.dart';
 import 'package:intl/intl.dart';
 
 class DashboardPage extends StatelessWidget {
-  DashboardPage({super.key});
+  DashboardPage({
+    super.key,
+  });
 
+  // ==========================
+  // CARD MENU
+  // ==========================
+  Widget menuCard({
+    required IconData icon,
+    required String title,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 80,
+        margin: const EdgeInsets.only(
+          bottom: 12,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 20,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(
+            20,
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 5,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 25,
+              backgroundColor: color.withOpacity(
+                0.15,
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 28,
+              ),
+            ),
+            const SizedBox(
+              width: 15,
+            ),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              size: 18,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==========================
+  // LOGOUT
+  // ==========================
   Future<void> logout(
     BuildContext context,
   ) async {
@@ -77,7 +149,7 @@ class DashboardPage extends StatelessWidget {
               // HEADER
               // =====================
               Text(
-                "Halo, $currentUser",
+                "Halo, $currentUser 👋",
                 style: const TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
@@ -412,67 +484,4 @@ class DashboardPage extends StatelessWidget {
       ),
     );
   }
-
-  Widget menuCard({
-      required IconData icon,
-      required String title,
-      required Color color,
-      required VoidCallback onTap,
-    }) {
-      return GestureDetector(
-        onTap: onTap,
-        child: Container(
-          height: 80,
-          margin: const EdgeInsets.only(
-            bottom: 12,
-          ),
-          padding: const EdgeInsets.symmetric(
-            horizontal: 20,
-          ),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(
-              20,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 5,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 25,
-                backgroundColor: color.withOpacity(0.15),
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(
-                width: 15,
-              ),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                size: 18,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
 }

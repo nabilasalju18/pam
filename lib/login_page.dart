@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dashboard_page.dart';
 import 'main.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({
@@ -20,73 +18,164 @@ class _LoginPageState extends State<LoginPage> {
 
   bool isHidden = true;
 
-  @override
-  void dispose() {
-    usernameController.dispose();
-    passwordController.dispose();
-    super.dispose();
-  }
-
+  // =====================
+  // LOGIN
+  // =====================
   Future<void> login() async {
     String username = usernameController.text.trim();
+
     String password = passwordController.text.trim();
 
-    try {
-      final supabase = Supabase.instance.client;
-
-      final data = await supabase
-          .from('users')
-          .select()
-          .eq('username', username)
-          .eq('password', password)
-          .maybeSingle();
-
-      if (data != null) {
-        currentUser = data['username'];
-        currentRole = data['role'];
-
-        await simpanData();
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => DashboardPage(),
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Username dan Password wajib diisi",
           ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Username atau password salah"),
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error: $e"),
         ),
       );
+      return;
     }
+
+    // =====================
+    // ADMIN
+    // =====================
+    if (username == "admin" && password == "12345") {
+      currentUser = "Administrator";
+
+      currentRole = "admin";
+
+      await simpanData();
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DashboardPage(),
+        ),
+      );
+
+      return;
+    }
+
+    // =====================
+    // PETUGAS
+    // =====================
+    if (username == "petugas" && password == "12345") {
+      currentUser = "Petugas";
+
+      currentRole = "petugas";
+
+      await simpanData();
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DashboardPage(),
+        ),
+      );
+
+      return;
+    }
+
+    // =====================
+    // PELANGGAN
+    // username = nama pelanggan
+    // password = 12345
+    // =====================
+    bool pelangganAda = dataPelanggan.any(
+      (pelanggan) =>
+          pelanggan["nama"].toString().toLowerCase() == username.toLowerCase(),
+    );
+
+    if (pelangganAda && password == "12345") {
+      currentUser = username;
+
+      currentRole = "pelanggan";
+
+      await simpanData();
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DashboardPage(),
+        ),
+      );
+
+      return;
+    }
+
+    // =====================
+    // GAGAL LOGIN
+    // =====================
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(
+      const SnackBar(
+        content: Text(
+          "Username / Password salah",
+        ),
+      ),
+    );
   }
 
-Future<void> simpanData() async {
-  SharedPreferences prefs = await SharedPreferences.getInstance();
-  await prefs.setString('username', currentUser );
-  await prefs.setString('role', currentRole );
-  
-  await prefs.setBool('is_login', true);
-}
-  
+  Widget inputField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool isPassword = false,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: isPassword ? isHidden : false,
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: Colors.white,
+        prefixIcon: Icon(
+          icon,
+          color: Colors.blue,
+        ),
+        suffixIcon: isPassword
+            ? IconButton(
+                onPressed: () {
+                  setState(
+                    () {
+                      isHidden = !isHidden;
+                    },
+                  );
+                },
+                icon: Icon(
+                  isHidden ? Icons.visibility : Icons.visibility_off,
+                ),
+              )
+            : null,
+        labelText: label,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(
+            18,
+          ),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xff1976D2),
-              Color(0xff64B5F6),
+              Color(
+                0xff1976D2,
+              ),
+              Color(
+                0xff64B5F6,
+              ),
             ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -199,46 +288,4 @@ Future<void> simpanData() async {
       ),
     );
   }
-
-  Widget inputField({
-    required TextEditingController controller,
-    required String label,
-    required IconData icon,
-    bool isPassword = false,
-  }) {
-    return TextField(
-      controller: controller,
-      obscureText: isPassword ? isHidden : false,
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: Colors.white,
-        prefixIcon: Icon(
-          icon,
-          color: Colors.blue,
-        ),
-        suffixIcon: isPassword
-            ? IconButton(
-                onPressed: () {
-                  setState(
-                    () {
-                      isHidden = !isHidden;
-                    },
-                  );
-                },
-                icon: Icon(
-                  isHidden ? Icons.visibility : Icons.visibility_off,
-                ),
-              )
-            : null,
-        labelText: label,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(
-            18,
-          ),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-
 }

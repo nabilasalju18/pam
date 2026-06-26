@@ -1,398 +1,255 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 import 'main.dart';
 
 class TagihanSayaPage extends StatefulWidget {
-  const TagihanSayaPage({
-    super.key,
-  });
+  const TagihanSayaPage({super.key});
 
   @override
   State<TagihanSayaPage> createState() => _TagihanSayaPageState();
 }
 
 class _TagihanSayaPageState extends State<TagihanSayaPage> {
-  final formatRupiah = NumberFormat.currency(
-    locale: 'id_ID',
-    symbol: 'Rp',
-    decimalDigits: 0,
-  );
+  final ImagePicker picker = ImagePicker();
 
-  // ==========================
-  // PILIH GAMBAR BUKTI TRANSFER
-  // ==========================
-  Future<void> pilihGambar(
-    Map<String, dynamic> item,
-    String metodeBayar,
-  ) async {
-    final ImagePicker picker = ImagePicker();
-
+  Future<void> uploadBukti(int index) async {
     final XFile? image = await picker.pickImage(
       source: ImageSource.gallery,
-      imageQuality: 70,
     );
 
     if (image == null) return;
 
-    item["status"] = "Menunggu Verifikasi";
-
-    item["metode"] = metodeBayar;
-
-    item["buktiTransfer"] = image.path;
+    setState(() {
+      dataTagihan[index]["bukti"] = image.path;
+      dataTagihan[index]["status"] = "Menunggu Verifikasi";
+    });
 
     await simpanData();
 
-    setState(() {});
-
     if (!mounted) return;
 
-    Navigator.pop(context);
-
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      const SnackBar(
         content: Text(
-          "Bukti pembayaran berhasil dikirim ($metodeBayar)",
+          "Bukti pembayaran berhasil diupload",
         ),
       ),
     );
   }
 
-  // ==========================
-  // PILIH METODE PEMBAYARAN
-  // ==========================
-  void pilihPembayaran(
-    Map<String, dynamic> item,
-  ) {
-    String metodeBayar = "Transfer Bank";
-
-    showDialog(
+  void pilihPembayaran(int index) {
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (_) {
-        return StatefulBuilder(
-          builder: (
-            context,
-            setDialogState,
-          ) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(
-                  20,
-                ),
-              ),
-              title: const Text(
-                "Metode Pembayaran",
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
+        return SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 children: [
-                  radioItem(
-                    "Transfer Bank",
-                    metodeBayar,
-                    setDialogState,
-                    (v) => metodeBayar = v,
+                  const Text(
+                    "Pilih Metode Pembayaran",
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  radioItem(
-                    "DANA",
-                    metodeBayar,
-                    setDialogState,
-                    (v) => metodeBayar = v,
+                  const SizedBox(height: 15),
+                  ListTile(
+                    leading: const Icon(Icons.qr_code),
+                    title: const Text("QRIS"),
+                    onTap: () {
+                      Navigator.pop(context);
+
+                      showDialog(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text("QRIS"),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.qr_code,
+                                size: 150,
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                "Nominal : Rp ${dataTagihan[index]["tagihan"]}",
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                  radioItem(
-                    "ShopeePay",
-                    metodeBayar,
-                    setDialogState,
-                    (v) => metodeBayar = v,
+                  const ListTile(
+                    leading: Icon(Icons.account_balance_wallet),
+                    title: Text("GoPay"),
+                    subtitle: Text("081234567890"),
                   ),
-                  radioItem(
-                    "OVO",
-                    metodeBayar,
-                    setDialogState,
-                    (v) => metodeBayar = v,
+                  const ListTile(
+                    leading: Icon(Icons.account_balance_wallet),
+                    title: Text("OVO"),
+                    subtitle: Text("081234567890"),
                   ),
-                  radioItem(
-                    "GoPay",
-                    metodeBayar,
-                    setDialogState,
-                    (v) => metodeBayar = v,
+                  const ListTile(
+                    leading: Icon(Icons.account_balance_wallet),
+                    title: Text("ShopeePay"),
+                    subtitle: Text("081234567890"),
                   ),
-                  radioItem(
-                    "QRIS",
-                    metodeBayar,
-                    setDialogState,
-                    (v) => metodeBayar = v,
+                  const ListTile(
+                    leading: Icon(Icons.account_balance),
+                    title: Text("Transfer Bank"),
+                    subtitle: Text(
+                      "BCA - 1234567890\nA.n PAM Tirta Sejahtera",
+                    ),
                   ),
                 ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(
-                      context,
-                    );
-                  },
-                  child: const Text(
-                    "Batal",
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    await pilihGambar(
-                      item,
-                      metodeBayar,
-                    );
-                  },
-                  child: const Text(
-                    "Upload Bukti",
-                  ),
-                ),
-              ],
-            );
-          },
+            ),
+          ),
         );
       },
     );
   }
 
-  // ==========================
-  // RADIO BUTTON
-  // ==========================
-  Widget radioItem(
-    String title,
-    String group,
-    StateSetter setDialogState,
-    Function(String) onChanged,
-  ) {
-    return RadioListTile(
-      value: title,
-      groupValue: group,
-      title: Text(title),
-      onChanged: (value) {
-        setDialogState(() {
-          onChanged(value!);
-        });
-      },
-    );
-  }
-
   @override
-  Widget build(
-    BuildContext context,
-  ) {
-    final tagihanSaya = dataTagihan
-        .where(
-          (item) =>
-              item["nama"].toString().toLowerCase() ==
-              currentUser.toLowerCase(),
-        )
-        .toList();
+  Widget build(BuildContext context) {
+    final tagihanUser = dataTagihan.where((item) {
+      return item["nama"].toString().toLowerCase() == currentUser.toLowerCase();
+    }).toList();
 
-    int totalTagihan = tagihanSaya.fold(
-      0,
-      (sum, item) => sum + (item["tagihan"] as int),
-    );
+    int totalTagihan =
+        tagihanUser.where((item) => item["status"] != "Lunas").fold(
+              0,
+              (sum, item) => sum + ((item["tagihan"] ?? 0) as int),
+            );
 
     return Scaffold(
-      backgroundColor: const Color(
-        0xffF5F9FF,
-      ),
       appBar: AppBar(
-        backgroundColor: Colors.blue,
-        title: const Text(
-          "Tagihan Saya",
-        ),
+        title: const Text("Tagihan Saya"),
       ),
-      body: tagihanSaya.isEmpty
-          ? const Center(
-              child: Text(
-                "Tidak ada tagihan",
-              ),
-            )
-          : Column(
+      body: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.blue,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Column(
               children: [
-                // TOTAL TAGIHAN
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.all(
-                    20,
-                  ),
-                  padding: const EdgeInsets.all(
-                    20,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [
-                        Colors.blue,
-                        Color(
-                          0xff42A5F5,
-                        ),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(
-                      20,
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        "Total Tagihan",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(
-                        height: 10,
-                      ),
-                      Text(
-                        formatRupiah.format(
-                          totalTagihan,
-                        ),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 30,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                const Text(
+                  "Total Tagihan",
+                  style: TextStyle(
+                    color: Colors.white,
                   ),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  "Rp $totalTagihan",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 25,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: dataTagihan.isEmpty
+                ? const Center(
+                    child: Text("Belum ada tagihan"),
+                  )
+                : ListView.builder(
+                    itemCount: tagihanUser.length,
+                    itemBuilder: (context, index) {
+                      final item = tagihanUser[index];
 
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: tagihanSaya.length,
-                    itemBuilder: (
-                      context,
-                      index,
-                    ) {
-                      final item = tagihanSaya[index];
+                      String status =
+                          item["status"]?.toString() ?? "Belum Bayar";
 
-                      bool lunas = item["status"] == "Lunas";
-
-                      bool menunggu = item["status"] == "Menunggu Verifikasi";
+                      Color warnaStatus = status == "Lunas"
+                          ? Colors.green
+                          : status == "Menunggu Verifikasi"
+                              ? Colors.orange
+                              : Colors.red;
 
                       return Card(
                         margin: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(
-                            20,
-                          ),
+                          horizontal: 12,
+                          vertical: 6,
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.all(
-                            15,
-                          ),
+                          padding: const EdgeInsets.all(12),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: lunas
-                                      ? Colors.green
-                                      : menunggu
-                                          ? Colors.orange
-                                          : Colors.red,
-                                  child: Icon(
-                                    lunas ? Icons.check : Icons.warning,
+                              Text(
+                                item["nama"]?.toString() ?? "-",
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                "Periode : ${item["bulan"] ?? "-"}",
+                              ),
+                              Text(
+                                "Pemakaian : ${item["pemakaian"] ?? 0} m³",
+                              ),
+                              Text(
+                                "Tagihan : Rp ${item["tagihan"] ?? 0}",
+                              ),
+                              const SizedBox(height: 10),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: warnaStatus,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  status,
+                                  style: const TextStyle(
                                     color: Colors.white,
                                   ),
                                 ),
-                                title: Text(
-                                  "Pemakaian ${item["pemakaian"]} m³",
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      formatRupiah.format(
-                                        item["tagihan"],
-                                      ),
-                                    ),
-
-                                    Text(
-                                      "Metode : ${item["metode"] ?? "-"}",
-                                    ),
-
-                                    const SizedBox(
-                                      height: 8,
-                                    ),
-
-                                    // PREVIEW BUKTI
-                                    if (item["buktiTransfer"] != null)
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(
-                                          12,
-                                        ),
-                                        child: Image.file(
-                                          File(
-                                            item["buktiTransfer"],
-                                          ),
-                                          height: 120,
-                                          width: double.infinity,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                                trailing: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: lunas
-                                        ? Colors.green.shade100
-                                        : menunggu
-                                            ? Colors.orange.shade100
-                                            : Colors.red.shade100,
-                                    borderRadius: BorderRadius.circular(
-                                      12,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    item["status"],
-                                    style: TextStyle(
-                                      color: lunas
-                                          ? Colors.green
-                                          : menunggu
-                                              ? Colors.orange
-                                              : Colors.red,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
                               ),
-
-                              const SizedBox(
-                                height: 10,
-                              ),
-
-                              // TOMBOL BAYAR
-                              if (!lunas && !menunggu)
+                              const SizedBox(height: 10),
+                              if (status != "Lunas")
                                 SizedBox(
                                   width: double.infinity,
                                   child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
-                                    ),
+                                    icon: const Icon(Icons.payment),
+                                    label: const Text("Bayar"),
                                     onPressed: () {
-                                      pilihPembayaran(
-                                        item,
-                                      );
+                                      pilihPembayaran(index);
                                     },
+                                  ),
+                                ),
+                              const SizedBox(height: 8),
+                              if (status != "Lunas")
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
                                     icon: const Icon(
-                                      Icons.payments,
-                                      color: Colors.white,
+                                      Icons.upload_file,
                                     ),
                                     label: const Text(
-                                      "Bayar Sekarang",
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                      ),
+                                      "Upload Bukti Pembayaran",
                                     ),
+                                    onPressed: () {
+                                      int indexAsli = dataTagihan.indexOf(item);
+                                      uploadBukti(indexAsli);
+                                    },
                                   ),
                                 ),
                             ],
@@ -401,9 +258,9 @@ class _TagihanSayaPageState extends State<TagihanSayaPage> {
                       );
                     },
                   ),
-                ),
-              ],
-            ),
+          ),
+        ],
+      ),
     );
   }
 }

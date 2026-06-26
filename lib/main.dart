@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'login_page.dart';
 import 'dashboard_page.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 List<Map<String, dynamic>> dataPelanggan = [];
 
@@ -117,12 +117,9 @@ Future<void> loadData() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await loadData();
 
-  await Supabase.initialize(
-    url: 'https://ffchsmgkzhkbibzpaawd.supabase.co',
-    publishableKey: 'sb_publishable_TvhSlR06UtG0ZcY9nb7G-A_8Ch5rIrW',
-  );
   runApp(
     const MyApp(),
   );
