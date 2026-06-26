@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -11,9 +10,6 @@ List<Map<String, dynamic>> dataTagihan = [];
 
 List<Map<String, dynamic>> dataRiwayat = [];
 
-// =======================
-// LOGIN USER
-// =======================
 String currentUser = "";
 String currentRole = "";
 
@@ -22,93 +18,7 @@ Future<void> loadSession() async {
   currentUser = prefs.getString("currentUser") ?? "";
   currentRole = prefs.getString("currentRole") ?? "";
 }
-// =======================
-// SIMPAN DATA
-// =======================
-Future<void> simpanData() async {
-  final prefs = await SharedPreferences.getInstance();
 
-  await prefs.setString(
-    "pelanggan",
-    jsonEncode(
-      dataPelanggan,
-    ),
-  );
-
-  await prefs.setString(
-    "tagihan",
-    jsonEncode(
-      dataTagihan,
-    ),
-  );
-
-  await prefs.setString(
-    "riwayat",
-    jsonEncode(
-      dataRiwayat,
-    ),
-  );
-
-  // LOGIN SESSION
-  await prefs.setString(
-    "currentUser",
-    currentUser,
-  );
-
-  await prefs.setString(
-    "currentRole",
-    currentRole,
-  );
-}
-
-// =======================
-// LOAD DATA
-// =======================
-Future<void> loadData() async {
-  final prefs = await SharedPreferences.getInstance();
-
-  String? tagihan = prefs.getString(
-    "tagihan",
-  );
-
-  String? riwayat = prefs.getString(
-    "riwayat",
-  );
-
-  // LOAD PELANGGAN
-
-
-  // LOAD TAGIHAN
-  if (tagihan != null) {
-    dataTagihan = List<Map<String, dynamic>>.from(
-      jsonDecode(
-        tagihan,
-      ),
-    );
-  }
-
-  // LOAD RIWAYAT
-  if (riwayat != null) {
-    dataRiwayat = List<Map<String, dynamic>>.from(
-      jsonDecode(
-        riwayat,
-      ),
-    );
-  }
-
-  // ===================
-  // LOAD LOGIN SESSION
-  // ===================
-  currentUser = prefs.getString(
-        "currentUser",
-      ) ??
-      "";
-
-  currentRole = prefs.getString(
-        "currentRole",
-      ) ??
-      "";
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -144,9 +54,6 @@ class MyApp extends StatelessWidget {
         ),
       ),
 
-      // ===================
-      // AUTO LOGIN
-      // ===================
       home: currentRole.isNotEmpty ? DashboardPage() : const LoginPage(),
     );
   }
